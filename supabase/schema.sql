@@ -15,7 +15,55 @@ create table if not exists institutions (
     created_at timestamp with time zone default now()
 );
 
--- Users (Employees & Admins)
+-- Organizations (Tenants)
+create table if not exists organizations (
+    slug text primary key,
+    name text not null,
+    admin_password text not null default 'admin123',
+    settings jsonb default '{}'::jsonb, -- geofence, payroll, qr_secret
+    attendance_methods jsonb default '{"gps":true, "qr":true, "nfc":true, "face":true, "manual":true}'::jsonb,
+    created_at timestamp with time zone default now()
+);
+
+-- Insert default organization
+insert into organizations (slug, name) values ('default', 'Default Organization') on conflict do nothing;
+
+-- Employees (Tenant-specific workers)
+create table if not exists employees (
+    id uuid default uuid_generate_v4() primary key,
+    org_slug text references organizations(slug) default 'default',
+    employee_code text not null,
+    name text not null,
+    department text,
+    telegram_id bigint unique,
+    nfc_card_id text,
+    active boolean default true,
+    salary_type text default 'fixed', -- 'fixed' or 'hourly'
+    base_salary numeric(10,2) default 0,
+    hourly_rate numeric(10,2) default 0,
+    created_at timestamp with time zone default now(),
+    unique(org_slug, employee_code)
+);
+
+create table if not exists payroll_adjustments (
+    id uuid default uuid_generate_v4() primary key,
+    org_slug text references organizations(slug) default 'default',
+    employee_code text not null,
+    month text not null, -- YYYY-MM
+    amount numeric(10,2) not null,
+    type text not null check (type in ('addition', 'deduction')),
+    description text,
+    created_at timestamp with time zone default now()
+);
+
+-- update attendance to use employee_code and org_slug
+alter table attendance add column if not exists org_slug text references organizations(slug) default 'default';
+alter table attendance add column if not exists employee_code text;
+
+-- update face enrollments to use employee_code and org_slug
+alter table face_enrollments add column if not exists org_slug text references organizations(slug) default 'default';
+alter table face_enrollments add column if not exists employee_code text;
+
 create table if not exists users (
     id uuid default uuid_generate_v4() primary key,
     institution_id uuid references institutions(id) on delete cascade,
@@ -28,6 +76,14 @@ create table if not exists users (
     nfc_tag_id text unique,
     hourly_rate numeric(10,2) default 0,
     face_encoding_reference text, -- In a real app this holds face vectors or a reference image URL
+    created_at timestamp with time zone default now()
+);
+
+-- Face Enrollments
+create table if not exists face_enrollments (
+    id uuid default uuid_generate_v4() primary key,
+    user_id uuid references users(id) on delete cascade,
+    descriptor jsonb not null, -- Stores the 128-d float array (e.g. as JSON)
     created_at timestamp with time zone default now()
 );
 
@@ -59,6 +115,3 @@ create table if not exists payroll (
     status text check (status in ('draft', 'approved', 'paid')) default 'draft',
     created_at timestamp with time zone default now()
 );
-
--- Dummy Seed Data for Testing (Safe to run multiple times with upsert if necessary, but just basic inserts here)
--- In a real app you would use unique constraints or real migration tools.

@@ -1,11 +1,39 @@
 'use client';
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Clock, Bell } from 'lucide-react';
-import { ClockInWidget } from '@/components/ClockInWidget';
+import dynamic from 'next/dynamic';
+import { AttendanceChart } from '@/components/AttendanceChart';
+
+import { OfficeQRCodeWidget } from '@/components/OfficeQRCodeWidget';
+import Link from 'next/link';
+
+const FaceRegistrationModal = dynamic(() => import('@/components/FaceRegistrationModal').then(mod => mod.FaceRegistrationModal), { ssr: false });
+
+function RealTimeClock() {
+  const [time, setTime] = useState(new Date());
+
+  useEffect(() => {
+    const timer = setInterval(() => setTime(new Date()), 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  return (
+    <div className="flex items-center gap-2 px-4 py-2 bg-white/10 rounded-xl backdrop-blur-md border border-white/20">
+      <Clock className="w-5 h-5 text-white/90" />
+      <span className="text-white font-medium tracking-wide">
+        {time.toLocaleTimeString('km-KH', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+      </span>
+      <span className="text-white/60 text-sm ml-2 hidden sm:block">
+        {time.toLocaleDateString('km-KH', { weekday: 'short', month: 'short', day: 'numeric' })}
+      </span>
+    </div>
+  );
+}
 
 export default function SecureAttendDashboard() {
-  const [duckMood, setDuckMood] = React.useState(false);
+  const [duckMood, setDuckMood] = useState(false);
+  const [isFaceModalOpen, setFaceModalOpen] = useState(false);
 
   return (
     <div className={`h-screen bg-slate-50 flex overflow-hidden font-sans select-none text-slate-800 relative ${duckMood ? 'bg-yellow-50' : ''}`}>
@@ -27,175 +55,153 @@ export default function SecureAttendDashboard() {
           ))}
         </div>
       )}
-      {/* Sidebar - Sleek Theme */}
-      <div className="w-64 h-full bg-gradient-to-b from-indigo-700 to-violet-800 text-white flex-col hidden md:flex">
-        <div className="p-6 flex items-center gap-3">
-          <div className="w-10 h-10 bg-white/20 rounded-xl backdrop-blur-md flex items-center justify-center border border-white/30">
-            <ShieldIcon className="w-5 h-5 text-white" />
-          </div>
-          <span className="text-xl font-bold tracking-tight">SecureAttend</span>
-        </div>
+      
+      <FaceRegistrationModal 
+        isOpen={isFaceModalOpen} 
+        onClose={() => setFaceModalOpen(false)} 
+        // Dummy ID for local testing. In reality this comes from logged-in user session
+        userId="user-1234-5678" 
+      />
 
-        <nav className="flex-1 px-4 space-y-1 mt-4">
-          <div className="bg-white/15 px-4 py-3 rounded-xl flex items-center gap-3">
-            <div className="w-2 h-2 rounded-full bg-indigo-300"></div>
-            <span className="font-medium">ផ្ទាំងគ្រប់គ្រង</span>
-          </div>
-          <div className="px-4 py-3 rounded-xl flex items-center gap-3 hover:bg-white/5 transition-colors cursor-pointer opacity-80">
-            <span className="w-2 h-2 rounded-full border border-white/40"></span>
-            <span>វត្តមានបុគ្គលិក</span>
-          </div>
-          <div className="px-4 py-3 rounded-xl flex items-center gap-3 hover:bg-white/5 transition-colors cursor-pointer opacity-80">
-            <span className="w-2 h-2 rounded-full border border-white/40"></span>
-            <span>បញ្ជីឈ្មោះបុគ្គលិក</span>
-          </div>
-          <div className="px-4 py-3 rounded-xl flex items-center gap-3 hover:bg-white/5 transition-colors cursor-pointer opacity-80">
-            <span className="w-2 h-2 rounded-full border border-white/40"></span>
-            <span>បើកប្រាក់បៀវត្សរ៍</span>
-          </div>
-          <div className="px-4 py-3 rounded-xl flex items-center gap-3 hover:bg-white/5 transition-colors cursor-pointer opacity-80">
-            <span className="w-2 h-2 rounded-full border border-white/40"></span>
-            <span>របាយការណ៍</span>
-          </div>
-        </nav>
-
-        <div className="p-6 border-t border-white/10">
-          <div className="bg-white/10 rounded-lg p-3 flex items-center gap-3 hover:bg-white/15 transition-colors cursor-pointer">
-            <div className="w-8 h-8 rounded-full bg-indigo-400 border border-white/20 flex items-center justify-center">
-              <span className="text-xs font-bold">BR</span>
-            </div>
-            <div className="overflow-hidden">
-              <p className="text-xs font-semibold truncate">វិទ្យាល័យ ប៊ុន រ៉ានី</p>
-              <p className="text-[10px] opacity-60 uppercase tracking-widest">Admin Portal</p>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Main Content Area */}
+      {/* Main Content Area (Full Width since we are putting logo in the header) */}
       <div className="flex-1 flex flex-col min-w-0">
-        {/* Sleek Top Header */}
-        <header className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-6 lg:px-8 shrink-0">
-          <div className="flex items-center gap-4">
-            <h2 className="text-lg font-semibold text-slate-700">ទិដ្ឋភាពទូទៅថ្ងៃនេះ</h2>
-            <span className="hidden sm:inline-block px-3 py-1 bg-green-50 text-green-600 text-xs font-bold rounded-full border border-green-100">
+        <header className="bg-gradient-to-r from-[var(--brand-700)] to-[var(--brand-500)] shrink-0 shadow-[var(--shadow-soft)] z-10">
+          <div className="flex items-center justify-between px-6 lg:px-8 h-20 border-b border-white/10">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-white/20 rounded-xl backdrop-blur-md flex items-center justify-center border border-white/30">
+                 <div className="w-5 h-5 bg-white rounded-sm drop-shadow-md"></div>
+              </div>
+              <span className="text-xl font-bold tracking-tight text-white drop-shadow-sm">SecureAttend</span>
+            </div>
+
+            <RealTimeClock />
+
+            <div className="flex items-center gap-4 sm:gap-6">
+              <div className="relative group">
+                <div className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-[var(--brand-600)]"></div>
+                <div className="text-white/80 hover:text-white cursor-pointer transition-colors p-2 bg-white/5 rounded-full hover:bg-white/10">
+                  <Bell className="w-5 h-5" />
+                </div>
+              </div>
+              <div className="hidden sm:block h-8 w-[1px] bg-white/20"></div>
+              <div className="flex items-center gap-3 bg-white/10 pl-3 pr-1.5 py-1.5 rounded-full border border-white/20 cursor-pointer hover:bg-white/20 transition-colors">
+                <p className="text-sm font-medium text-white hidden sm:block drop-shadow-sm">សុខ ចាន់ដារ៉ា</p>
+                <div className="w-8 h-8 bg-white rounded-full flex items-center justify-center font-bold text-[var(--brand-600)] shadow-inner text-sm">SC</div>
+              </div>
+            </div>
+          </div>
+          
+          <div className="px-6 lg:px-8 py-8 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div>
+              <h1 className="text-3xl font-bold text-white tracking-tight drop-shadow-md">អរុណសួស្តី, ចាន់ដារ៉ា! 👋</h1>
+              <p className="text-white/80 mt-1 font-medium">នេះជារបាយការណ៍សង្ខេបសម្រាប់ថ្ងៃនេះ។</p>
+            </div>
+            <span className="px-4 py-1.5 bg-emerald-500/20 text-emerald-100 text-xs font-bold rounded-full border border-emerald-500/30 backdrop-blur-md">
               ប្រព័ន្ធដំណើរការធម្មតា
             </span>
           </div>
-          <div className="flex items-center gap-4 sm:gap-6">
-            <div className="relative group">
-              <div className="absolute -top-1 -right-1 w-2 h-2 bg-red-500 rounded-full border-2 border-white"></div>
-              <div className="text-slate-400 hover:text-slate-600 cursor-pointer">
-                <Bell className="w-6 h-6" />
-              </div>
-            </div>
-            <div className="hidden sm:block h-8 w-[1px] bg-slate-200"></div>
-            <div className="flex items-center gap-3">
-              <p className="text-sm font-medium hidden sm:block">សុខ ចាន់ដារ៉ា</p>
-              <div className="w-9 h-9 bg-slate-100 rounded-full flex items-center justify-center font-bold text-indigo-600 border border-slate-200">SC</div>
-            </div>
-          </div>
         </header>
 
-        {/* Scrollable Content */}
-        <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8 flex flex-col gap-6">
-          {/* Dashboard Stats */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-            <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
-              <p className="text-slate-400 text-sm font-medium mb-1">បុគ្គលិកសរុប</p>
+        <main className="flex-1 overflow-y-auto px-4 sm:px-6 lg:px-8 py-8 flex flex-col gap-8 -mt-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 relative z-10">
+            <div className="bg-[var(--surface-main)] p-6 rounded-2xl shadow-[var(--shadow-soft)] border border-slate-100">
+              <p className="text-slate-500 text-sm font-medium mb-2">បុគ្គលិកសរុប</p>
               <div className="flex items-end justify-between">
                 <h3 className="text-3xl font-bold text-slate-800">1,240</h3>
-                <span className="text-green-500 text-xs font-bold">+4 ថ្មី</span>
+                <span className="text-emerald-500 text-xs font-bold bg-emerald-50 px-2 py-1 rounded-md">+4 ថ្មី</span>
               </div>
             </div>
-            <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
-              <p className="text-slate-400 text-sm font-medium mb-1">វត្តមានថ្ងៃនេះ</p>
+            <div className="bg-[var(--surface-main)] p-6 rounded-2xl shadow-[var(--shadow-soft)] border border-slate-100">
+              <p className="text-slate-500 text-sm font-medium mb-2">វត្តមានថ្ងៃនេះ</p>
               <div className="flex items-end justify-between">
-                <h3 className="text-3xl font-bold text-indigo-600">1,185</h3>
-                <span className="text-slate-400 text-xs text-right">95.5% នៃសរុប</span>
+                <h3 className="text-3xl font-bold text-[var(--brand-600)]">1,185</h3>
+                <span className="text-slate-400 text-xs font-medium">95.5% នៃសរុប</span>
               </div>
             </div>
-            <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200">
-              <p className="text-slate-400 text-sm font-medium mb-1">មកយឺត</p>
+            <div className="bg-[var(--surface-main)] p-6 rounded-2xl shadow-[var(--shadow-soft)] border border-slate-100">
+              <p className="text-slate-500 text-sm font-medium mb-2">មកយឺត</p>
               <div className="flex items-end justify-between">
                 <h3 className="text-3xl font-bold text-orange-500">42</h3>
-                <span className="text-orange-500/80 text-xs font-bold">-12% ធៀបខែមុn</span>
+                <span className="text-orange-600 text-xs font-bold bg-orange-50 px-2 py-1 rounded-md">-12% ធៀបខែមុន</span>
               </div>
             </div>
-            <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200 border-l-4 border-l-red-500">
-              <p className="text-slate-400 text-sm font-medium mb-1">អវត្តមាន</p>
+            <div className="bg-[var(--surface-main)] p-6 rounded-2xl shadow-[var(--shadow-soft)] border border-slate-100 border-l-4 border-l-red-500">
+              <p className="text-slate-500 text-sm font-medium mb-2">អវត្តមាន</p>
               <div className="flex items-end justify-between">
                 <h3 className="text-3xl font-bold text-red-600">13</h3>
-                <span className="text-slate-400 text-xs">គ្មានច្បាប់</span>
+                <span className="text-slate-400 text-xs font-medium">គ្មានច្បាប់</span>
               </div>
             </div>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start flex-1 min-h-0">
-            <div className="lg:col-span-8 flex flex-col gap-6 w-full">
-              {/* Reuse our ClockInWidget but it fits perfectly into the sleek theme container */}
-              <ClockInWidget />
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start min-h-0">
+            <div className="lg:col-span-8 flex flex-col gap-8 w-full">
+              <div className="bg-indigo-600 rounded-3xl p-8 text-white shadow-lg relative overflow-hidden flex flex-col sm:flex-row items-center justify-between gap-6">
+                 <div className="relative z-10">
+                    <h3 className="text-2xl font-bold mb-2 tracking-tight">បុគ្គលិកចុះវត្តមានទីនេះ</h3>
+                    <p className="text-indigo-200 text-sm max-w-sm leading-relaxed">ចូលទៅកាន់ទំព័រចុះវត្តមានសម្រាប់បុគ្គលិក (មុខ, QR, ទីតាំង) នៅលើតំណភ្ជាប់ខាងក្រោម។</p>
+                 </div>
+                 <div className="relative z-10 flex gap-3">
+                    <Link href="/employee" className="px-6 py-3 bg-white text-indigo-700 font-bold rounded-xl shadow-md hover:bg-indigo-50 transition-colors whitespace-nowrap">
+                      មុខងារបុគ្គលិក →
+                    </Link>
+                    <Link href="/admin" className="px-6 py-3 bg-indigo-500/50 text-white font-bold rounded-xl hover:bg-indigo-500 transition-colors whitespace-nowrap border border-indigo-400">
+                      គ្រប់គ្រងប្រព័ន្ធ (Admin)
+                    </Link>
+                 </div>
+                 <div className="absolute right-0 bottom-0 opacity-10 w-64 h-64 bg-white rounded-full blur-3xl transform translate-x-1/3 translate-y-1/3"></div>
+              </div>
+              <AttendanceChart />
               
-              {/* Footer System Status Bar Extracted from Sleek Theme */}
-              <div className="h-12 bg-indigo-50 border border-indigo-100 rounded-xl flex items-center justify-between px-6 shrink-0 w-full">
-                <div className="flex items-center gap-2">
-                  <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-                  <span className="text-[11px] font-bold text-indigo-900 uppercase tracking-wide">Telegram Bot ភ្ជាប់រួចរាល់ - សារកំពុងដំណើរការ</span>
+              <div className="h-14 bg-indigo-50/50 border border-[var(--brand-100)] rounded-2xl flex items-center justify-between px-6 w-full shadow-sm">
+                <div className="flex items-center gap-3">
+                  <span className="relative flex h-3 w-3">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-500"></span>
+                  </span>
+                  <span className="text-xs font-bold text-[var(--brand-700)] uppercase tracking-wide">Telegram Bot ភ្ជាប់រួចរាល់ - សារកំពុងដំណើរការ</span>
                 </div>
-                <div className="hidden sm:flex items-center gap-4">
-                  <span className="text-[11px] text-indigo-400 font-medium italic">Supabase: Connected</span>
-                  <span className="text-[11px] text-indigo-400 font-medium italic">Version 1.0.4-prod</span>
+                <div className="hidden sm:flex items-center gap-6">
+                  <span className="text-xs text-[var(--brand-600)] font-medium">Supabase: Connected</span>
+                  <span className="text-xs text-slate-400 font-medium">Version 1.0.4-prod</span>
                 </div>
               </div>
             </div>
             
-            <div className="lg:col-span-4 flex flex-col gap-6 w-full">
-              {/* Sleek Theme Controls panel */}
-              <div className="bg-white rounded-2xl shadow-sm border border-slate-200 flex flex-col w-full">
-                <div className="p-5 border-b border-slate-100">
-                  <h3 className="font-bold text-slate-700">ការគ្រប់គ្រងប្រព័ន្ធ</h3>
+            <div className="lg:col-span-4 flex flex-col gap-8 w-full">
+              <div className="bg-[var(--surface-main)] rounded-3xl shadow-[var(--shadow-soft)] border border-slate-100 flex flex-col w-full overflow-hidden">
+                <div className="p-6 border-b border-slate-100 bg-slate-50/50">
+                  <h3 className="font-bold text-slate-800 text-lg">ការគ្រប់គ្រងប្រព័ន្ធ</h3>
+                  <p className="text-xs text-slate-500 mt-1">System Controls & Settings</p>
                 </div>
                 <div className="p-6 space-y-6">
                   <div className="flex items-center justify-between">
                     <div className="space-y-1">
                       <p className="text-sm font-semibold text-slate-800">AI Face Tracking</p>
-                      <p className="text-xs text-slate-400">ដំណើរការដោយ AI Accuracy 99.8%</p>
+                      <p className="text-xs text-slate-500">ដំណើរការដោយ AI Accuracy 99.8%</p>
                     </div>
-                    <div className="w-10 h-5 bg-indigo-600 rounded-full relative cursor-pointer shadow-sm">
-                      <div className="absolute right-1 top-1 w-3 h-3 bg-white rounded-full transition-all"></div>
-                    </div>
+                    <button 
+                       onClick={() => setFaceModalOpen(true)}
+                       className="text-xs px-4 py-2 bg-[var(--brand-50)] text-[var(--brand-600)] rounded-lg font-bold border border-[var(--brand-100)] hover:bg-[var(--brand-100)] transition-colors shadow-sm"
+                    >
+                      ចុះឈ្មោះមុខ
+                    </button>
                   </div>
-                  <div className="flex items-center justify-between">
-                    <div className="space-y-1">
-                      <p className="text-sm font-semibold text-slate-800">GPS Geofencing</p>
-                      <p className="text-xs text-slate-400">Radius: 100 ម៉ែត្រជុំវិញស្ថាប័ន</p>
-                    </div>
-                    <div className="w-10 h-5 bg-indigo-600 rounded-full relative cursor-pointer shadow-sm">
-                      <div className="absolute right-1 top-1 w-3 h-3 bg-white rounded-full transition-all"></div>
-                    </div>
-                  </div>
+                  
                   <div className="flex items-center justify-between border-t border-slate-100 pt-6 mt-2">
                     <div className="space-y-1">
                       <p className="text-sm font-semibold text-slate-800 flex items-center gap-2">Duck Mood 🦆</p>
-                      <p className="text-xs text-slate-400">បើកមុខងារទាហ្វូង</p>
+                      <p className="text-xs text-slate-500">បើកមុខងារទាហ្វូងលេងៗ</p>
                     </div>
                     <div 
                       onClick={() => setDuckMood(!duckMood)}
-                      className={`w-10 h-5 rounded-full relative cursor-pointer shadow-sm transition-colors ${duckMood ? 'bg-yellow-400' : 'bg-slate-200'}`}
+                      className={`w-12 h-6 rounded-full relative cursor-pointer shadow-inner transition-colors ${duckMood ? 'bg-yellow-400' : 'bg-slate-200'}`}
                     >
-                      <div className={`absolute top-1 w-3 h-3 bg-white rounded-full transition-all ${duckMood ? 'right-1' : 'left-1'}`}></div>
+                      <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all shadow-sm ${duckMood ? 'right-1' : 'left-1'}`}></div>
                     </div>
                   </div>
-                  <div className="mt-4 p-4 bg-slate-50 rounded-xl border border-dashed border-slate-300">
-                    <p className="text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-2">QR វត្តមានបច្ចុប្បន្ន</p>
-                    <div className="w-full aspect-square max-h-[200px] bg-white border border-slate-200 rounded flex items-center justify-center relative overflow-hidden">
-                       <img src="https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=SecureAttendCheckIn" alt="QR Code" className="w-32 h-32 object-contain" />
-                       <div className="absolute inset-0 border-4 border-white opacity-20 pointer-events-none"></div>
-                    </div>
-                    <p className="text-[10px] text-center text-slate-400 mt-2 italic flex items-center justify-center gap-1">
-                      <Clock className="w-3 h-3" /> កូដនឹងប្តូររៀងរាល់ ៦០វិនាទី
-                    </p>
-                  </div>
+                  
+                  <OfficeQRCodeWidget />
                 </div>
               </div>
             </div>
@@ -204,28 +210,4 @@ export default function SecureAttendDashboard() {
       </div>
     </div>
   );
-}
-
-function StatCard() {
-  return null; // the sleek theme replaced this component pattern with inline cards in the layout structure. It's safe to just return null or remove usage.
-}
-
-function ShieldIcon(props: React.SVGProps<SVGSVGElement>) {
-  return (
-    <svg
-      {...props}
-      xmlns="http://www.w3.org/2000/svg"
-      width="24"
-      height="24"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2-1 4-2 7-2 2.5 0 4.5 1 6.5 2a1 1 0 0 1 1 1z" />
-      <path d="m9 12 2 2 4-4" />
-    </svg>
-  )
 }

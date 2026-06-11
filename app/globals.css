@@ -1,8 +1,21 @@
 @import "tailwindcss";
-@import "tw-animate-css";
 
 @theme {
-  --font-sans: var(--font-kantumruy), ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+  --font-sans: var(--font-kantumruy-pro), ui-sans-serif, system-ui, sans-serif;
+}
+
+@layer base {
+  :root {
+    --brand-50: #eef2ff;
+    --brand-100: #e0e7ff;
+    --brand-500: #6366f1;
+    --brand-600: #4f46e5;
+    --brand-700: #4338ca;
+    
+    --surface-main: #ffffff;
+    --surface-muted: #f8fafc;
+    --shadow-soft: 0 4px 20px -2px rgba(0, 0, 0, 0.05);
+  }
 }
 
 @layer utilities {
