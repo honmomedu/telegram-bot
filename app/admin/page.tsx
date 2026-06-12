@@ -59,7 +59,11 @@ export default function AdminPage() {
 
   const fetchEmployees = async () => {
     setLoadingEmployees(true);
-    const { data } = await supabase.from('employees').select('*').eq('org_slug', orgSlug).order('created_at', { ascending: false });
+    const { data, error } = await supabase.from('employees').select('*').eq('org_slug', orgSlug).order('created_at', { ascending: false });
+    if (error) {
+       console.error("Supabase Error Full:", error);
+       alert(`ការភ្ជាប់ទិន្នន័យបរាជ័យ (Data Fetch Error): ${error.message}. Please check if NEXT_PUBLIC_SUPABASE_ANON_KEY is correct in Vercel.`);
+    }
     if (data) setEmployees(data);
     setLoadingEmployees(false);
   };
@@ -179,11 +183,16 @@ function EmployeesTab({ employees, loading, reload, orgSlug }: { employees: any[
   const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault();
     setAdding(true);
-    await supabase.from('employees').insert({ org_slug: orgSlug, employee_code: empCode, name });
+    const { error } = await supabase.from('employees').insert({ org_slug: orgSlug, employee_code: empCode, name });
+    if (error) {
+       console.error("Supabase Insert Error:", error);
+       alert(`ការបញ្ចូលបរាជ័យ (Insert Error): ${error.message} - it might be a wrong ANON KEY, or Row Level Security is blocking it.`);
+    } else {
+       setEmpCode('');
+       setName('');
+       reload();
+    }
     setAdding(false);
-    setEmpCode('');
-    setName('');
-    reload();
   };
 
   const handleDelete = async (id: string) => {
@@ -256,22 +265,49 @@ function EmployeesTab({ employees, loading, reload, orgSlug }: { employees: any[
 }
 
 // ---------------- Telegram Tab ----------------
+// ---------------- Telegram Bot Tab ----------------
 function TelegramTab() {
+  const [webhookStatus, setWebhookStatus] = useState<string>('');
+
+  const handleSetWebhook = async () => {
+    setWebhookStatus('កំពុងដំឡើង Webhook... (Setting up...)');
+    try {
+      const res = await fetch('/api/telegram/set-webhook');
+      const data = await res.json();
+      if (data.success) {
+        setWebhookStatus('✅ Webhook បានដំឡើងជោគជ័យ (Success)! URL: ' + data.webhookUrl);
+      } else {
+        setWebhookStatus('❌ បរាជ័យ (Error): ' + (data.error || JSON.stringify(data)));
+      }
+    } catch(err: any) {
+      setWebhookStatus('❌ បរាជ័យក្នុងការតភ្ជាប់ (Connection Error): ' + err.message);
+    }
+  };
+
   return (
     <div className="bg-white p-8 rounded-2xl shadow-sm border border-slate-200 max-w-2xl">
       <h3 className="text-xl font-bold text-slate-800 mb-4 flex items-center gap-2">
          <MessageSquare className="w-6 h-6 text-blue-500" /> ការកំណត់ Telegram Bot
       </h3>
       <p className="text-slate-600 mb-6 leading-relaxed">
-         The bot webhook is configured at <code className="bg-slate-100 px-2 py-1 rounded text-slate-800 text-sm">/api/bot</code>. 
-         Employees can search for your bot on Telegram, hit START to launch the Mini App, or send <code className="bg-slate-100 px-2 py-1 rounded text-slate-800 text-sm">/link EMP-xxx</code> to bind their account manually.
+         ការដំឡើង Webhook គឺដើម្បីភ្ជាប់ Telegram មកកាន់ប្រព័ន្ធរបស់អ្នក។ សូមចុចប៊ូតុងខាងក្រោមដើម្បីដំឡើង។ (Click the button below to register the Vercel URL with Telegram API).
       </p>
       
       <div className="space-y-4">
-         <div className="p-4 bg-blue-50 rounded-xl border border-blue-100">
-            <h4 className="font-bold text-blue-900 mb-1">Bot Token</h4>
-            <p className="text-sm font-mono text-blue-700">{process.env.NEXT_PUBLIC_TELEGRAM_BOT_TOKEN ? 'Loaded (Hidden)' : 'Not Set in Client Env'}</p>
+         <div className="p-4 bg-blue-50 rounded-xl border border-blue-100 flex justify-between items-center">
+            <div>
+              <h4 className="font-bold text-blue-900 mb-1">Telegram Webhook</h4>
+              <p className="text-sm font-mono text-blue-700">Set the webhook URL dynamically.</p>
+            </div>
+            <button onClick={handleSetWebhook} className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-bold text-sm shadow-sm transition-colors">
+              Set Webhook
+            </button>
          </div>
+         {webhookStatus && (
+            <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl text-sm font-mono text-slate-800 whitespace-pre-wrap">
+              {webhookStatus}
+            </div>
+         )}
       </div>
     </div>
   );
@@ -282,6 +318,7 @@ function SystemTab({ orgSlug }: { orgSlug: string }) {
   const [lat, setLat] = useState('11.5564');
   const [lng, setLng] = useState('104.9282');
   const [radius, setRadius] = useState('50');
+  const [dbStatus, setDbStatus] = useState<string>('');
 
   useEffect(() => {
     supabase.from('organizations').select('settings').eq('slug', orgSlug).single().then(({ data }) => {
@@ -319,45 +356,80 @@ function SystemTab({ orgSlug }: { orgSlug: string }) {
     }
   };
 
+  const checkConnection = async () => {
+    setDbStatus('កំពុងឆែកមើល... (Checking...)');
+    try {
+        const { data, error } = await supabase.from('employees').select('id').limit(1);
+        if (error) {
+            if (error.code === 'PGRST301' || error.message.includes('JWT') || error.message.includes('401')) {
+                setDbStatus(`❌ Error 401 (Unauthorized):\n\nមូលហេតុ (Reason): NEXT_PUBLIC_SUPABASE_ANON_KEY មិនត្រឹមត្រូវ ឬផុតកំណត់។ \n\nវិធីដោះស្រាយ (Solution): \n1. ចូលទៅ Supabase Dashboard -> Project Settings -> API \n2. កូពី "anon" និង "public" key មកដាក់ក្នុង Vercel Environment Variables ឲ្យបានត្រឹមត្រូវ។`);
+            } else if (error.code === 'PGRST106' || error.message.includes('relation') || error.message.includes('404')) {
+                setDbStatus(`❌ Error 404 (Not Found):\n\nមូលហេតុ (Reason): រកមិនឃើញតារាង (Table Not Found) ឬ URL ខុស។ \n\nវិធីដោះស្រាយ (Solution):\n1. ពិនិត្យមើលថា តើអ្នកបានចម្លង URL ត្រឹមត្រូវឬទេ (NEXT_PUBLIC_SUPABASE_URL)\n2. នៅក្នុង Supabase Dashboard -> SQL Editor -> ត្រូវប្រាកដថាអ្នកបាន Run SQL Code ដើម្បីបង្កើតតារាង (Table) ទាំងអស់។`);
+            } else {
+                setDbStatus(`❌ បរាជ័យ (Error): ${error.message} - Code: ${error.code}`);
+            }
+        } else {
+            setDbStatus('✅ ជោគជ័យ (Connected Successfully). Database ដំណើរការធម្មតា។ មិនមានបញ្ហា 401 ឬ 404 ទេ។');
+        }
+    } catch(err: any) {
+         setDbStatus(`❌ បរាជ័យ (Error): ${err.message}. \n\nសូមពិនិត្យ NEXT_PUBLIC_SUPABASE_URL ក្នុង Project របស់អ្នក។`);
+    }
+  };
+
   return (
-    <div className="bg-white p-8 rounded-2xl shadow-sm border border-slate-200 max-w-2xl">
-      <h3 className="text-xl font-bold text-slate-800 mb-6 flex items-center gap-2">
-         <Settings className="w-6 h-6 text-slate-600" /> ការកំណត់ប្រព័ន្ធ (System Settings)
-      </h3>
-      
-      <form onSubmit={handleSave} className="space-y-6">
-         <div className="space-y-4">
-           <h4 className="font-semibold text-slate-700 border-b border-slate-100 pb-2">ទីតាំងការិយាល័យ (Office Location)</h4>
-           
-           <div className="grid grid-cols-2 gap-4">
-             <div>
-                <label className="text-xs font-bold text-slate-500 uppercase tracking-widest block mb-2">រយៈទទឹង (Latitude)</label>
-                <input type="text" value={lat} onChange={(e)=>setLat(e.target.value)} className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-indigo-500" />
+    <div className="space-y-6 max-w-2xl">
+      <div className="bg-white p-8 rounded-2xl shadow-sm border border-slate-200">
+        <h3 className="text-xl font-bold text-slate-800 mb-6 flex items-center gap-2">
+           <Settings className="w-6 h-6 text-slate-600" /> ការកំណត់ប្រព័ន្ធ (System Settings)
+        </h3>
+        
+        <form onSubmit={handleSave} className="space-y-6">
+           <div className="space-y-4">
+             <h4 className="font-semibold text-slate-700 border-b border-slate-100 pb-2">ទីតាំងការិយាល័យ (Office Location)</h4>
+             
+             <div className="grid grid-cols-2 gap-4">
+               <div>
+                  <label className="text-xs font-bold text-slate-500 uppercase tracking-widest block mb-2">រយៈទទឹង (Latitude)</label>
+                  <input type="text" value={lat} onChange={(e)=>setLat(e.target.value)} className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-indigo-500" />
+               </div>
+               <div>
+                  <label className="text-xs font-bold text-slate-500 uppercase tracking-widest block mb-2">រយៈបណ្តោយ (Longitude)</label>
+                  <input type="text" value={lng} onChange={(e)=>setLng(e.target.value)} className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-indigo-500" />
+               </div>
              </div>
+             
              <div>
-                <label className="text-xs font-bold text-slate-500 uppercase tracking-widest block mb-2">រយៈបណ្តោយ (Longitude)</label>
-                <input type="text" value={lng} onChange={(e)=>setLng(e.target.value)} className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-indigo-500" />
+                <label className="text-xs font-bold text-slate-500 uppercase tracking-widest block mb-2">កាំអនុញ្ញាតជាម៉ែត្រ (Radius in meters)</label>
+                <input type="number" value={radius} onChange={(e)=>setRadius(e.target.value)} className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-indigo-500" />
              </div>
-           </div>
-           
-           <div>
-              <label className="text-xs font-bold text-slate-500 uppercase tracking-widest block mb-2">កាំអនុញ្ញាតជាម៉ែត្រ (Radius in meters)</label>
-              <input type="number" value={radius} onChange={(e)=>setRadius(e.target.value)} className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-indigo-500" />
+
+             <div className="flex gap-4">
+                <button type="button" onClick={getCurrentLocation} className="flex-1 py-2 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 rounded-xl font-bold transition-colors flex items-center justify-center gap-2">
+                   <MapPin className="w-4 h-4" /> យកទីតាំងបច្ចុប្បន្ន (Current GPS)
+                </button>
+             </div>
            </div>
 
-           <div className="flex gap-4">
-              <button type="button" onClick={getCurrentLocation} className="flex-1 py-2 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 rounded-xl font-bold transition-colors flex items-center justify-center gap-2">
-                 <MapPin className="w-4 h-4" /> យកទីតាំងបច្ចុប្បន្ន (Current GPS)
+           <div className="pt-6 border-t border-slate-100 flex justify-end">
+              <button type="submit" className="px-8 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold transition-colors shadow-md">
+                 រក្សាទុក (Save Settings)
               </button>
            </div>
-         </div>
+        </form>
+      </div>
 
-         <div className="pt-6 border-t border-slate-100 flex justify-end">
-            <button type="submit" className="px-8 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold transition-colors shadow-md">
-               រក្សាទុក (Save Settings)
-            </button>
-         </div>
-      </form>
+      <div className="bg-white p-8 rounded-2xl shadow-sm border border-slate-200">
+        <h3 className="text-xl font-bold text-slate-800 mb-4">Diagnostics (ពិនិត្យប្រព័ន្ធ)</h3>
+        <p className="text-slate-600 mb-4 whitespace-pre-wrap">ប្រសិនបើប្រព័ន្ធជួបបញ្ហា Error 401 ឬ Error 404 សូមចុចប៉ូតុងខាងក្រោមដើម្បីពិនិត្យ (Click below to check database connection).</p>
+        <button type="button" onClick={checkConnection} className="px-6 py-2 bg-slate-800 hover:bg-slate-900 text-white rounded-xl font-bold transition-colors shadow-md mb-4">
+          Check Supabase Connection 
+        </button>
+        {dbStatus && (
+          <div className="p-4 bg-slate-50 rounded-xl text-slate-700 whitespace-pre-wrap font-mono text-sm border border-slate-200">
+            {dbStatus}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

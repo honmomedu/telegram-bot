@@ -1,7 +1,6 @@
 -- SecureAttend Database Schema (Postgres)
 -- Multi-tenant HR and Payroll System
 
--- Enable Row Level Security
 create extension if not exists "uuid-ossp";
 
 -- Institutions (Tenants)
@@ -56,14 +55,6 @@ create table if not exists payroll_adjustments (
     created_at timestamp with time zone default now()
 );
 
--- update attendance to use employee_code and org_slug
-alter table attendance add column if not exists org_slug text references organizations(slug) default 'default';
-alter table attendance add column if not exists employee_code text;
-
--- update face enrollments to use employee_code and org_slug
-alter table face_enrollments add column if not exists org_slug text references organizations(slug) default 'default';
-alter table face_enrollments add column if not exists employee_code text;
-
 create table if not exists users (
     id uuid default uuid_generate_v4() primary key,
     institution_id uuid references institutions(id) on delete cascade,
@@ -84,6 +75,8 @@ create table if not exists face_enrollments (
     id uuid default uuid_generate_v4() primary key,
     user_id uuid references users(id) on delete cascade,
     descriptor jsonb not null, -- Stores the 128-d float array (e.g. as JSON)
+    org_slug text references organizations(slug) default 'default',
+    employee_code text,
     created_at timestamp with time zone default now()
 );
 
@@ -98,6 +91,8 @@ create table if not exists attendance (
     check_in_location_lat double precision,
     check_in_location_lng double precision,
     status text check (status in ('present', 'late', 'absent', 'half_day')) default 'present',
+    org_slug text references organizations(slug) default 'default',
+    employee_code text,
     created_at timestamp with time zone default now()
 );
 
@@ -115,3 +110,18 @@ create table if not exists payroll (
     status text check (status in ('draft', 'approved', 'paid')) default 'draft',
     created_at timestamp with time zone default now()
 );
+
+-- Disable Row Level Security to allow client-side anonymous inserts (for the MVP/testing phase)
+alter table institutions disable row level security;
+alter table organizations disable row level security;
+alter table employees disable row level security;
+alter table payroll_adjustments disable row level security;
+alter table users disable row level security;
+alter table face_enrollments disable row level security;
+alter table attendance disable row level security;
+alter table payroll disable row level security;
+
+-- Grant permissions to anonymous and authenticated users
+grant usage on schema public to anon, authenticated;
+grant all privileges on all tables in schema public to anon, authenticated;
+grant all privileges on all sequences in schema public to anon, authenticated;

@@ -7,7 +7,7 @@ export async function GET(req: NextRequest) {
   
   // You can override this via NEXT_PUBLIC_APP_URL if defined
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || `${protocol}//${host}`;
-  const webhookUrl = `${appUrl}/api/telegram/webhook`;
+  const webhookUrl = `${appUrl}/api/bot`;
   const botToken = process.env.TELEGRAM_BOT_TOKEN;
 
   if (!botToken) {
