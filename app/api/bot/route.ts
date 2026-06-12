@@ -20,10 +20,10 @@ function setupBot(token: string, appUrl: string) {
   const bot = new Telegraf(token);
 
   bot.start(async (ctx) => {
-    await ctx.reply('Welcome to SecureAttend! Please open the Mini App to check in or register.', {
+    await ctx.reply('សាលារៀនខ្មែរ សូមស្វាគមន៍!', {
       reply_markup: {
         inline_keyboard: [
-          [{ text: 'Open Mini App', web_app: { url: `${appUrl}/employee` } }]
+          [{ text: 'ចុចទីនេះដើម្បីចុះវត្តមាន', web_app: { url: `${appUrl}/employee` } }]
         ]
       }
     });
