@@ -38,7 +38,8 @@ ${groupKnowledge}
 
 /**
  * Generates an AI response using the Google Gen AI SDK.
- * Handles missing API key, rate limits, and Telegram message length limits.
+ * Includes automatic retry on 503 High Demand, model fallback (e.g. gemini-2.5-flash),
+ * and polite localized error handling.
  */
 export async function askGemini(prompt: string): Promise<string> {
   const client = getClient();
@@ -52,38 +53,63 @@ export async function askGemini(prompt: string): Promise<string> {
     );
   }
 
-  try {
-    const response = await client.models.generateContent({
-      model: config.geminiModel,
-      contents: prompt,
-      config: {
-        systemInstruction: buildSystemInstruction(),
-      },
-    });
+  // Model fallback candidates: primary model first, followed by stable flash model
+  const candidateModels = Array.from(new Set([config.geminiModel, "gemini-2.5-flash"]));
+  const systemInstruction = buildSystemInstruction();
 
-    const reply = response.text?.trim();
-    if (!reply) {
-      return "🤖 មិនមានចម្លើយពី Gemini AI ទេ សូមសាកល្បងម្ដងទៀត។";
+  let lastError: Error | null = null;
+
+  for (const model of candidateModels) {
+    // Retry transient 503 / 429 errors up to 2 times
+    for (let attempt = 1; attempt <= 2; attempt++) {
+      try {
+        const response = await client.models.generateContent({
+          model,
+          contents: prompt,
+          config: {
+            systemInstruction,
+          },
+        });
+
+        const reply = response.text?.trim();
+        if (reply) {
+          // Telegram messages have a hard limit of 4096 characters
+          if (reply.length > 4000) {
+            return reply.slice(0, 3990) + "\n\n...(អត្ថបទត្រូវបានកាត់ត្រឹមនេះ)";
+          }
+          return reply;
+        }
+      } catch (error: unknown) {
+        lastError = error as Error;
+        const errMsg = lastError.message || "";
+
+        // If high demand or rate limit, pause briefly before retrying or switching models
+        if (errMsg.includes("503") || errMsg.includes("high demand") || errMsg.includes("429")) {
+          if (attempt === 1) {
+            await new Promise((resolve) => setTimeout(resolve, 1000));
+            continue;
+          }
+        }
+        // If other error, move to fallback model
+        break;
+      }
     }
-
-    // Telegram messages have a hard limit of 4096 characters
-    if (reply.length > 4000) {
-      return reply.slice(0, 3990) + "\n\n...(អត្ថបទត្រូវបានកាត់ត្រឹមនេះ)";
-    }
-
-    return reply;
-  } catch (error: unknown) {
-    const err = error as Error;
-    console.error("[Gemini Error]:", err);
-
-    if (err.message?.includes("API_KEY_INVALID") || err.message?.includes("invalid API key")) {
-      return "❌ *កំហុស API Key:* `GEMINI_API_KEY` មិនត្រឹមត្រូវទេ។ សូមពិនិត្យមើល Key របស់អ្នកឡើងវិញ។";
-    }
-
-    if (err.message?.includes("RESOURCE_EXHAUSTED") || err.message?.includes("quota")) {
-      return "⏳ *ជាប់ Quota:* សំណើច្រើនពេក សូមរង់ចាំមួយភ្លែត រួចសាកល្បងម្ដងទៀត។";
-    }
-
-    return `⚠️ *កំហុសពី Gemini AI:* ${err.message || "មិនអាចដំណើរការបាននៅពេលនេះ"}`;
   }
+
+  const errMessage = lastError?.message || "";
+  console.error("[Gemini Final Error]:", errMessage);
+
+  if (errMessage.includes("503") || errMessage.includes("high demand")) {
+    return "⏳ *ប្រព័ន្ធ Gemini AI កំពុងមានអ្នកប្រើប្រាស់ច្រើន (High Demand)*។ សូមរង់ចាំប្រហែល ៥ ទៅ ១០ វិនាទី រួចសាកល្បងម្ដងទៀត!";
+  }
+
+  if (errMessage.includes("API_KEY_INVALID") || errMessage.includes("invalid API key")) {
+    return "❌ *កំហុស API Key:* `GEMINI_API_KEY` មិនត្រឹមត្រូវទេ។ សូមពិនិត្យមើល Key របស់អ្នកឡើងវិញ។";
+  }
+
+  if (errMessage.includes("RESOURCE_EXHAUSTED") || errMessage.includes("quota")) {
+    return "⏳ *ជាប់ Quota:* សំណើច្រើនពេក សូមរង់ចាំមួយភ្លែត រួចសាកល្បងម្ដងទៀត។";
+  }
+
+  return "⚠️ *កំហុសពី Gemini AI:* មិនអាចដំណើរការបាននៅពេលនេះ សូមសាកល្បងម្ដងទៀតបន្តិចក្រោយ។";
 }
