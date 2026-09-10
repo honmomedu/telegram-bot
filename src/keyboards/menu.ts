@@ -1,19 +1,12 @@
-import { Keyboard, InlineKeyboard } from "grammy";
+import { InlineKeyboard } from "grammy";
 
 /**
- * Main persistent reply keyboard
+ * Clean UI: Helper to dismiss any persistent reply keyboards in groups.
  */
-export const mainMenuKeyboard = new Keyboard()
-  .text("📅 ប្រតិទិនចន្ទគតិ")
-  .text("💱 អត្រាប្តូរប្រាក់")
-  .row()
-  .text("🤖 សួរ Gemini AI")
-  .text("ℹ️ ជំនួយ")
-  .resized()
-  .persistent();
+export const removeKeyboard = { remove_keyboard: true as const };
 
 /**
- * Inline keyboard for Calendar messages
+ * Inline keyboard for Calendar messages (unobtrusive, attached only to message)
  */
 export const calendarInlineKeyboard = new InlineKeyboard()
   .text("🔄 ពិនិត្យឡើងវិញ", "refresh_calendar")
@@ -33,4 +26,5 @@ export const helpInlineKeyboard = new InlineKeyboard()
   .text("📅 ប្រតិទិន", "action_calendar")
   .text("💱 អត្រាប្តូរប្រាក់", "action_exchange")
   .row()
-  .url("🌐 Google AI Studio", "https://aistudio.google.com/");
+  .text("📜 វិន័យក្រុម", "action_rules")
+  .text("🏫 ព័ត៌មានក្រុម", "action_info");

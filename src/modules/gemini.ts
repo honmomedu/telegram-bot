@@ -1,5 +1,6 @@
 import { GoogleGenAI } from "@google/genai";
 import { config } from "../config.js";
+import { getGroupKnowledgePrompt } from "./groupInfo.js";
 
 let aiClient: GoogleGenAI | null = null;
 
@@ -13,16 +14,27 @@ function getClient(): GoogleGenAI | null {
   return aiClient;
 }
 
-const SYSTEM_INSTRUCTION = `
-You are an intelligent, polite, and friendly Telegram AI Assistant.
-- You are fluent in Khmer (ភាសាខ្មែរ) and English.
-- Always match the user's language: if the user writes in Khmer, reply in natural, polite Khmer. If they write in English, reply in English.
-- Structure answers clearly using Telegram-compatible Markdown (bold, lists, code blocks).
-- Keep replies concise, helpful, and pleasant to read on mobile devices.
-- Note: This bot also has built-in features for:
-  1) 📅 ប្រតិទិនចន្ទគតិខ្មែរ (Khmer Lunar Calendar) via /calendar or /date.
+function buildSystemInstruction(): string {
+  const groupKnowledge = getGroupKnowledgePrompt();
+
+  return `
+You are an intelligent, polite, and encouraging Educational Assistant & Community Mentor in a Telegram Study Group.
+- You are fluent in both Khmer (ភាសាខ្មែរ) and English.
+- Always respond in the language used by the member (Khmer or English).
+- Primary role: Help students and members with their learning, homework, research, concepts explanation, summaries, and language translation.
+- Group dynamics: Keep replies clear, well-structured, and concise so the group chat remains readable on mobile devices.
+- Tone: Polite, encouraging, educational, and respectful (e.g. "បាទ/ចាស", "សួស្តីប្អូន/មិត្ត", etc.).
+- When asked about group schedule, rules, resources, or contacts, use the provided group knowledge below.
+
+${groupKnowledge}
+
+- Note: You also know about the bot's features:
+  1) 📅 ប្រតិទិនចន្ទគតិខ្មែរ (Khmer Lunar Calendar & ថ្ងៃសីល) via /calendar or /date.
   2) 💱 អត្រាប្តូរប្រាក់ (Currency Exchange Rates) via /exchange or /rate.
+  3) 📜 វិន័យក្រុម via /rules.
+  4) 🏫 ព័ត៌មានក្រុម via /info.
 `.trim();
+}
 
 /**
  * Generates an AI response using the Google Gen AI SDK.
@@ -45,7 +57,7 @@ export async function askGemini(prompt: string): Promise<string> {
       model: config.geminiModel,
       contents: prompt,
       config: {
-        systemInstruction: SYSTEM_INSTRUCTION,
+        systemInstruction: buildSystemInstruction(),
       },
     });
 

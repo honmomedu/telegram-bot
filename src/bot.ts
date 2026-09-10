@@ -4,7 +4,18 @@ import { formatKhmerCalendarMessage } from "./modules/khmerCalendar.js";
 import { formatExchangeRateMessage } from "./modules/exchangeRate.js";
 import { askGemini } from "./modules/gemini.js";
 import {
-  mainMenuKeyboard,
+  formatRulesMessage,
+  formatGroupInfoMessage,
+  formatWelcomeMessage,
+} from "./modules/groupInfo.js";
+import {
+  handleWarnCommand,
+  handleMuteCommand,
+  handleUnmuteCommand,
+  handleKickCommand,
+} from "./modules/moderation.js";
+import {
+  removeKeyboard,
   calendarInlineKeyboard,
   exchangeInlineKeyboard,
   helpInlineKeyboard,
@@ -13,26 +24,48 @@ import {
 export const bot = new Bot(config.botToken);
 
 // ==========================================
-// 1. Bot Command Handlers
+// 1. Core Commands (/start, /help, /rules, /info)
 // ==========================================
 
 /**
- * /start command handler
+ * /start command handler (Dismisses any old bottom keyboard)
  */
 bot.command("start", async (ctx: Context) => {
   const userFirstName = ctx.from?.first_name || "មិត្តសំឡាញ់";
 
   const welcomeText =
-    `👋 *សួស្តី ${userFirstName}! សូមស្វាគមន៍មកកាន់ Telegram Assistant Bot*\n\n` +
-    `🤖 *មុខងារសំខាន់ៗរបស់ Bot:*\n` +
-    `• 📅 *ប្រតិទិនខ្មែរ:* មើលថ្ងៃខែសុរិយគតិ និងចន្ទគតិខ្មែរ (ខ្នើត/រោច, ឆ្នាំសត្វ, ស័ក, ព.ស., និងថ្ងៃសីល)\n` +
-    `• 💱 *អត្រាប្តូរប្រាក់:* មើលតម្លៃប្តូរប្រាក់ USD, KHR, THB, EUR, CNY, VND ក្នុងពេលជាក់ស្តែង\n` +
-    `• 🤖 *Gemini AI:* ឆ្លើយសំណួរ ជជែកកំសាន្ត និងបកប្រែភាសា\n\n` +
-    `👇 *សូមជ្រើសរើសមុខងារតាមរយៈប៊ូតុងខាងក្រោម ឬវាយពាក្យបញ្ជាផ្ទាល់៖*`;
+    `👋 *សួស្តី ${userFirstName}! ខ្ញុំជាជំនួយការ AI សម្រាប់ក្រុមរៀនសូត្រ* 🎓\n\n` +
+    `🤖 *មុខងារសំខាន់ៗ:*\n` +
+    `• 💡 *រៀនសូត្រ & ស្រាវជ្រាវ:* សួរមេរៀន លំហាត់ ឬបកប្រែភាសា (គ្រាន់តែ Mention ឬ Tag ខ្ញុំមក \`@mykh168bot\`)\n` +
+    `• 📜 *វិន័យក្រុម:* វាយ \`/rules\`\n` +
+    `• 🏫 *ព័ត៌មានក្រុម & កាលវិភាគ:* វាយ \`/info\`\n` +
+    `• 📅 *ប្រតិទិនខ្មែរ:* វាយ \`/calendar\` ឬ \`/date\`\n` +
+    `• 💱 *អត្រាប្តូរប្រាក់:* វាយ \`/rate\` ឬ \`/exchange\`\n\n` +
+    `💡 _នៅក្នុងក្រុម ខ្ញុំនឹងឆ្លើយតបតែពេលមានគេ Mention ឬ Reply លើសាររបស់ខ្ញុំប៉ុណ្ណោះ!_`;
 
   await ctx.reply(welcomeText, {
     parse_mode: "Markdown",
-    reply_markup: mainMenuKeyboard,
+    reply_markup: removeKeyboard,
+  });
+});
+
+/**
+ * /rules command handler
+ */
+bot.command("rules", async (ctx: Context) => {
+  await ctx.reply(formatRulesMessage(), {
+    parse_mode: "Markdown",
+    reply_to_message_id: ctx.message?.message_id,
+  });
+});
+
+/**
+ * /info command handler
+ */
+bot.command("info", async (ctx: Context) => {
+  await ctx.reply(formatGroupInfoMessage(), {
+    parse_mode: "Markdown",
+    reply_to_message_id: ctx.message?.message_id,
   });
 });
 
@@ -41,35 +74,49 @@ bot.command("start", async (ctx: Context) => {
  */
 bot.command("help", async (ctx: Context) => {
   const helpText =
-    `ℹ️ *ការណែនាំអំពីការប្រើប្រាស់ Bot:*\n\n` +
-    `📌 *បញ្ជីពាក្យបញ្ជា (Commands):*\n` +
-    `• /start - ចាប់ផ្តើម និងបង្ហាញម៉ឺនុយមេ\n` +
-    `• /calendar ឬ /date - មើលប្រតិទិនចន្ទគតិខ្មែរ និងថ្ងៃសីល\n` +
-    `• /exchange ឬ /rate - មើលអត្រាប្តូរប្រាក់បច្ចុប្បន្ន\n` +
-    `• /ai <សំណួរ> - សួរសំណួរទៅកាន់ Gemini AI\n` +
-    `• /help - បង្ហាញជំនួយនេះ\n\n` +
-    `💡 *ព័ត៌មានបន្ថែម:* នៅក្នុងការសន្ទនាផ្ទាល់ (Private Chat) អ្នកអាចវាយសំណួរណាមួយក៏បាន ដើម្បីសួរ Gemini AI ដោយផ្ទាល់!`;
+    `ℹ️ *ការណែនាំអំពីការប្រើប្រាស់ Bot ក្នុងក្រុម:*\n\n` +
+    `📌 *សម្រាប់សមាជិកទាំងអស់:*\n` +
+    `• Tag ឬ Mention មក \`@mykh168bot\` ដើម្បីសួរមេរៀន លំហាត់ ឬសង្ខេបអត្ថបទ\n` +
+    `• Reply លើសាររបស់ Bot ដើម្បីជជែកបន្ថែម\n` +
+    `• \`/rules\` - មើលវិន័យ និងគោលការណ៍រួម\n` +
+    `• \`/info\` - មើលកាលវិភាគ និងឯកសាររៀនសូត្រ\n` +
+    `• \`/calendar\` - មើលប្រតិទិនចន្ទគតិខ្មែរ និងថ្ងៃសីល\n` +
+    `• \`/rate\` - មើលអត្រាប្តូរប្រាក់\n\n` +
+    `🛡 *សម្រាប់ Admin គ្រប់គ្រងក្រុម:*\n` +
+    `• \`/warn\` (Reply លើសារ) - ព្រមានសមាជិក\n` +
+    `• \`/mute <នាទី>\` (Reply លើសារ) - បិទសំឡេងសមាជិកបណ្តោះអាសន្ន\n` +
+    `• \`/unmute\` (Reply លើសារ) - បើកសំឡេងវិញ\n` +
+    `• \`/kick\` (Reply លើសារ) - បណ្តេញចេញពីក្រុម`;
 
   await ctx.reply(helpText, {
     parse_mode: "Markdown",
     reply_markup: helpInlineKeyboard,
+    reply_to_message_id: ctx.message?.message_id,
   });
 });
 
-/**
- * /calendar and /date command handlers
- */
+// ==========================================
+// 2. Admin Moderation Commands (/warn, /mute, /unmute, /kick)
+// ==========================================
+
+bot.command("warn", handleWarnCommand);
+bot.command("mute", handleMuteCommand);
+bot.command("unmute", handleUnmuteCommand);
+bot.command("kick", handleKickCommand);
+
+// ==========================================
+// 3. Information Modules (/calendar, /exchange, /ai)
+// ==========================================
+
 bot.command(["calendar", "date"], async (ctx: Context) => {
   const calendarMsg = formatKhmerCalendarMessage();
   await ctx.reply(calendarMsg, {
     parse_mode: "Markdown",
     reply_markup: calendarInlineKeyboard,
+    reply_to_message_id: ctx.message?.message_id,
   });
 });
 
-/**
- * /exchange and /rate command handlers
- */
 bot.command(["exchange", "rate"], async (ctx: Context) => {
   await ctx.replyWithChatAction("typing");
   try {
@@ -77,90 +124,78 @@ bot.command(["exchange", "rate"], async (ctx: Context) => {
     await ctx.reply(exchangeMsg, {
       parse_mode: "Markdown",
       reply_markup: exchangeInlineKeyboard,
+      reply_to_message_id: ctx.message?.message_id,
     });
   } catch (error: unknown) {
     const err = error as Error;
-    await ctx.reply(`⚠️ មិនអាចទាញយកអត្រាប្តូរប្រាក់បានទេ៖ ${err.message}`);
+    await ctx.reply(`⚠️ មិនអាចទាញយកអត្រាប្តូរប្រាក់បានទេ៖ ${err.message}`, {
+      reply_to_message_id: ctx.message?.message_id,
+    });
   }
 });
 
-/**
- * /ai command handler
- */
 bot.command("ai", async (ctx: Context) => {
   const prompt = ctx.match?.toString().trim();
 
   if (!prompt) {
     await ctx.reply(
-      `🤖 *របៀបសួរ Gemini AI:*\n\n` +
-        `សូមវាយពាក្យបញ្ជាអមដោយសំណួរ ឧទាហរណ៍៖\n` +
-        `• \`/ai តើអង្គរវត្តសាងសង់ឡើងនៅសតវត្សរ៍ណា?\`\n` +
-        `• \`/ai សរសេរកំណាព្យអំពីធម្មជាតិខ្មែរ\`\n\n` +
-        `💡 ឬគ្រាន់តែវាយសំណួររបស់អ្នកផ្ញើមកទីនេះដោយផ្ទាល់!`,
-      { parse_mode: "Markdown" }
+      `🤖 *សូមសរសេរសំណួរអមជាមួយ:* ឧទាហរណ៍៖ \`/ai តើផែនដីវិលជុំវិញព្រះអាទិត្យរយៈពេលប៉ុន្មាន?\``,
+      {
+        parse_mode: "Markdown",
+        reply_to_message_id: ctx.message?.message_id,
+      }
     );
     return;
   }
 
   await ctx.replyWithChatAction("typing");
   const response = await askGemini(prompt);
-  await ctx.reply(response, { parse_mode: "Markdown" });
-});
-
-// ==========================================
-// 2. Reply Keyboard Text Listeners
-// ==========================================
-
-bot.hears("📅 ប្រតិទិនចន្ទគតិ", async (ctx: Context) => {
-  const calendarMsg = formatKhmerCalendarMessage();
-  await ctx.reply(calendarMsg, {
+  await ctx.reply(response, {
     parse_mode: "Markdown",
-    reply_markup: calendarInlineKeyboard,
+    reply_to_message_id: ctx.message?.message_id,
   });
 });
 
-bot.hears("💱 អត្រាប្តូរប្រាក់", async (ctx: Context) => {
-  await ctx.replyWithChatAction("typing");
-  try {
-    const exchangeMsg = await formatExchangeRateMessage();
-    await ctx.reply(exchangeMsg, {
-      parse_mode: "Markdown",
-      reply_markup: exchangeInlineKeyboard,
-    });
-  } catch (error: unknown) {
-    const err = error as Error;
-    await ctx.reply(`⚠️ មិនអាចទាញយកអត្រាប្តូរប្រាក់បានទេ៖ ${err.message}`);
+// ==========================================
+// 4. Welcome New Chat Members
+// ==========================================
+
+bot.on(":new_chat_members", async (ctx: Context) => {
+  const newMembers = ctx.message?.new_chat_members || [];
+
+  for (const member of newMembers) {
+    // If the bot itself was added to the group
+    if (member.id === ctx.me.id) {
+      await ctx.reply(
+        `👋 *សូមជម្រាបសួរអ្នកទាំងអស់គ្នា!* 🎓\n\n` +
+          `ខ្ញុំជា Bot ជំនួយការរៀនសូត្រ និងគ្រប់គ្រងក្រុម។\n` +
+          `• សួរមេរៀន/លំហាត់៖ Tag ឬ Mention មក \`@${ctx.me.username} <សំណួរ>\`\n` +
+          `• វាយ \`/rules\` ដើម្បីមើលវិន័យក្រុម\n` +
+          `• វាយ \`/info\` ដើម្បីមើលកាលវិភាគ និងឯកសារសិក្សា!`,
+        { parse_mode: "Markdown" }
+      );
+      continue;
+    }
+
+    // Welcome human member
+    const welcomeMsg = formatWelcomeMessage(member.first_name);
+    await ctx.reply(welcomeMsg, { parse_mode: "Markdown" });
   }
 });
 
-bot.hears("🤖 សួរ Gemini AI", async (ctx: Context) => {
-  await ctx.reply(
-    `🤖 *Gemini AI រួចរាល់ក្នុងការឆ្លើយសំណួរ!*\n\n` +
-      `លោកអ្នកអាច៖\n` +
-      `1. វាយសំណួររបស់អ្នកផ្ញើមកកាន់ទីនេះដោយផ្ទាល់\n` +
-      `2. ឬប្រើពាក្យបញ្ជា \`/ai <សំណួរ>\`\n\n` +
-      `✨ សួរជាភាសាខ្មែរ ឬភាសាអង់គ្លេសបានតាមចិត្ត!`,
-    { parse_mode: "Markdown" }
-  );
+// ==========================================
+// 5. Inline Keyboard Callback Queries
+// ==========================================
+
+bot.callbackQuery("action_rules", async (ctx) => {
+  await ctx.answerCallbackQuery();
+  await ctx.reply(formatRulesMessage(), { parse_mode: "Markdown" });
 });
 
-bot.hears("ℹ️ ជំនួយ", async (ctx: Context) => {
-  const helpText =
-    `ℹ️ *ជំនួយ និងការប្រើប្រាស់ Bot*\n\n` +
-    `• ចុច *📅 ប្រតិទិនចន្ទគតិ* ដើម្បីពិនិត្យថ្ងៃខ្នើត/រោច និងថ្ងៃសីល\n` +
-    `• ចុច *💱 អត្រាប្តូរប្រាក់* ដើម្បីពិនិត្យតម្លៃលុយដុល្លារ បាត យន់ អឺរ៉ូ\n` +
-    `• វាយសារធម្មតាដើម្បីជជែកជាមួយ *Gemini AI*\n\n` +
-    `⚙️ បង្កើតឡើងដោយ Node.js / TypeScript, grammY, @google/genai និង Vercel Serverless។`;
-
-  await ctx.reply(helpText, {
-    parse_mode: "Markdown",
-    reply_markup: helpInlineKeyboard,
-  });
+bot.callbackQuery("action_info", async (ctx) => {
+  await ctx.answerCallbackQuery();
+  await ctx.reply(formatGroupInfoMessage(), { parse_mode: "Markdown" });
 });
-
-// ==========================================
-// 3. Inline Keyboard Callback Actions
-// ==========================================
 
 bot.callbackQuery("refresh_calendar", async (ctx) => {
   await ctx.answerCallbackQuery({ text: "🔄 កំពុងធ្វើបច្ចុប្បន្នភាព..." });
@@ -171,7 +206,7 @@ bot.callbackQuery("refresh_calendar", async (ctx) => {
       reply_markup: calendarInlineKeyboard,
     });
   } catch {
-    // Content might be identical
+    // Ignored if message content is unchanged
   }
 });
 
@@ -213,36 +248,57 @@ bot.callbackQuery(["switch_calendar", "action_calendar"], async (ctx) => {
 });
 
 // ==========================================
-// 4. Default Text Message Handler (Gemini AI)
+// 6. Mention & Reply AI Listener (Zero Spam)
 // ==========================================
 
 bot.on("message:text", async (ctx: Context) => {
   const text = ctx.message?.text?.trim();
   if (!text) return;
 
-  // In group chats, only respond if mentioned or replied to
   const isPrivate = ctx.chat?.type === "private";
   const botUsername = ctx.me.username;
-  const isMentioned = botUsername ? text.includes(`@${botUsername}`) : false;
+
+  // In groups: Respond ONLY when mentioned (@bot) or replied to bot's message
+  const isMentioned = botUsername
+    ? text.toLowerCase().includes(`@${botUsername.toLowerCase()}`)
+    : false;
   const isReplyToBot = ctx.message?.reply_to_message?.from?.id === ctx.me.id;
 
   if (!isPrivate && !isMentioned && !isReplyToBot) {
+    // Stay silent, do not interfere with normal group conversation
     return;
   }
 
-  // Clean prompt if bot was mentioned in group
-  const cleanPrompt = botUsername ? text.replace(`@${botUsername}`, "").trim() : text;
-  if (!cleanPrompt) return;
+  // Strip bot's @username mention from the question
+  let cleanPrompt = text;
+  if (botUsername) {
+    const mentionRegex = new RegExp(`@${botUsername}`, "gi");
+    cleanPrompt = cleanPrompt.replace(mentionRegex, "").trim();
+  }
+
+  if (!cleanPrompt) {
+    await ctx.reply(
+      `👋 សួស្តី! តើប្អូន/មិត្តមានចម្ងល់ ឬសំណួរអ្វីចង់សួរខ្ញុំដែរទេ? (ឧទាហរណ៍៖ \`@${botUsername} ពន្យល់អំពីច្បាប់ញូតុន\`)`,
+      {
+        parse_mode: "Markdown",
+        reply_to_message_id: ctx.message?.message_id,
+      }
+    );
+    return;
+  }
 
   await ctx.replyWithChatAction("typing");
   const aiAnswer = await askGemini(cleanPrompt);
-  await ctx.reply(aiAnswer, { parse_mode: "Markdown" });
+  await ctx.reply(aiAnswer, {
+    parse_mode: "Markdown",
+    reply_to_message_id: ctx.message?.message_id,
+  });
 });
 
 // ==========================================
-// 5. Error Catching Middleware
+// 7. Error Handler
 // ==========================================
 
 bot.catch((err) => {
-  console.error(`[Telegram Bot Error] [ctx: ${err.ctx.update.update_id}]:`, err.error);
+  console.error(`[Telegram Bot Error] [Update ${err.ctx.update.update_id}]:`, err.error);
 });
