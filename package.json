@@ -1,0 +1,36 @@
+{
+  "name": "telegram-bot",
+  "version": "1.0.0",
+  "description": "Production-ready Telegram Bot in TypeScript with Gemini AI, Khmer Lunar Calendar, and Exchange Rates",
+  "type": "module",
+  "main": "api/webhook.ts",
+  "scripts": {
+    "dev": "tsx watch src/local.ts",
+    "start": "tsx src/local.ts",
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "test": "NODE_ENV=test tsx test/test-modules.ts && NODE_ENV=test tsx test/test-webhook.ts"
+  },
+  "keywords": [
+    "telegram-bot",
+    "grammy",
+    "gemini-ai",
+    "khmer-calendar",
+    "exchange-rate",
+    "vercel-serverless"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "@google/genai": "^2.21.0",
+    "@thyrith/momentkh": "^3.0.3",
+    "dotenv": "^16.4.7",
+    "grammy": "^1.46.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.10",
+    "@vercel/node": "^5.1.8",
+    "tsx": "^4.19.3",
+    "typescript": "^5.8.2"
+  }
+}
